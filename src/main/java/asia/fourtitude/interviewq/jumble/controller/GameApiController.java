@@ -2,6 +2,8 @@ package asia.fourtitude.interviewq.jumble.controller;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
+import java.util.ArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +43,7 @@ public class GameApiController {
     /*
      * In-memory database/repository for all the game boards/states.
      */
-    private final Map<String, GameGuessModel> gameBoards;
+    private final Map<String, GameState> gameBoards;
 
     @Autowired(required = true)
     public GameApiController(JumbleEngine jumbleEngine) {
@@ -83,11 +85,16 @@ public class GameApiController {
 
         GameState gameState = this.jumbleEngine.createGameState(6, 3);
 
-        /*
-         * TODO:
-         * a) Store the game state to the repository, with unique game board ID
-         * b) Return the game board/state (GameGuessOutput) to caller
-         */
+        String id = UUID.randomUUID().toString();
+        gameBoards.put(id, gameState);
+
+        output.setResult("Created new game.");
+        output.setId(id);
+        output.setOriginalWord(gameState.getOriginal());
+        output.setScrambleWord(gameState.getScramble());
+        output.setTotalWords(gameState.getSubWords().size());
+        output.setRemainingWords(gameState.getSubWords().size());
+        output.setGuessedWords(new ArrayList<>());
 
         return new ResponseEntity<>(output, HttpStatus.OK);
     }
@@ -211,18 +218,49 @@ public class GameApiController {
          * Refer to the method's Javadoc (above) and implement accordingly.
          * Must pass the corresponding unit tests.
          */
-        GameGuessOutput output = new GameGuessOutput();
+    	  GameGuessOutput output = new GameGuessOutput();
 
-        /*
-         * TODO:
-         * a) Validate the input (GameGuessInput)
-         * b) Check records exists in repository (search by input `id`)
-         * c) From the input guessing `word`, implement the game logic
-         * d) Update the game board (and game state) in repository
-         * e) Return the updated game board/state (GameGuessOutput) to caller
-         */
+          if (input == null || input.getId() == null || input.getId().isEmpty()) {
+              output.setResult("Invalid Game ID.");
+              return new ResponseEntity<>(output, HttpStatus.NOT_FOUND);
+          }
 
-        return new ResponseEntity<>(output, HttpStatus.OK);
+          GameState gameState = gameBoards.get(input.getId());
+          if (gameState == null) {
+              output.setResult("Game board/state not found.");
+              return new ResponseEntity<>(output, HttpStatus.NOT_FOUND);
+          }
+
+          String guessWord = input.getWord();
+
+          output.setId(input.getId());
+          output.setOriginalWord(gameState.getOriginal());
+          output.setScrambleWord(gameState.getScramble());
+          output.setGuessWord(guessWord);
+          output.setTotalWords(gameState.getSubWords().size());
+
+          if (guessWord == null || !gameState.getSubWords().containsKey(guessWord)) {
+              output.setResult("Guessed incorrectly.");
+              output.setRemainingWords(gameState.getSubWords().size() - gameState.getGuessedWords().size());
+              output.setGuessedWords(new ArrayList<>(gameState.getGuessedWords()));
+          } else if (!gameState.getGuessedWords().contains(guessWord)) {
+              gameState.getGuessedWords().add(guessWord);
+              gameState.getSubWords().put(guessWord, true);
+              output.setResult("Guessed correctly.");
+              output.setRemainingWords(gameState.getSubWords().size() - gameState.getGuessedWords().size());
+              output.setGuessedWords(new ArrayList<>(gameState.getGuessedWords()));
+
+              if (gameState.getGuessedWords().size() == gameState.getSubWords().size()) {
+                  output.setResult("All words guessed.");
+                  output.setRemainingWords(0);
+              }
+          } else {
+              output.setResult("Word already guessed.");
+              output.setRemainingWords(gameState.getSubWords().size() - gameState.getGuessedWords().size());
+              output.setGuessedWords(new ArrayList<>(gameState.getGuessedWords()));
+          }
+
+          return new ResponseEntity<>(output, HttpStatus.OK);
     }
 
 }

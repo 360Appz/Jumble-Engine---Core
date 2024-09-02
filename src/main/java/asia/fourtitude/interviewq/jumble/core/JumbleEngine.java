@@ -377,5 +377,18 @@ public class JumbleEngine {
         }
         return new GameState(original, scramble, subWords);
     }
+    
+    public String getValidSubWord(String originalWord) {
+        Collection<String> subWords = generateSubWords(originalWord, 3);
+        if (!subWords.isEmpty()) {
+            return subWords.iterator().next();
+        }
+        return null;
+    }
+
+    public String[] getAllValidSubWords(String originalWord) {
+        Collection<String> subWords = generateSubWords(originalWord, 3);
+        return subWords.toArray(new String[0]);
+    }
 
 }
